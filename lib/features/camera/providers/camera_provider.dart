@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -13,8 +12,6 @@ class CameraState {
   final bool isInitialized;
   final File? referenceImage;
   final File? capturedPhoto;
-  final double opacity;
-  final bool showOverlay;
   final String? poiId;
   final String? error;
 
@@ -22,8 +19,6 @@ class CameraState {
     this.isInitialized = false,
     this.referenceImage,
     this.capturedPhoto,
-    this.opacity = 0.5,
-    this.showOverlay = true,
     this.poiId,
     this.error,
   });
@@ -32,8 +27,6 @@ class CameraState {
     bool? isInitialized,
     File? referenceImage,
     File? capturedPhoto,
-    double? opacity,
-    bool? showOverlay,
     String? poiId,
     String? error,
     bool clearCapturedPhoto = false,
@@ -44,8 +37,6 @@ class CameraState {
       referenceImage: referenceImage ?? this.referenceImage,
       capturedPhoto:
           clearCapturedPhoto ? null : (capturedPhoto ?? this.capturedPhoto),
-      opacity: opacity ?? this.opacity,
-      showOverlay: showOverlay ?? this.showOverlay,
       poiId: poiId ?? this.poiId,
       error: clearError ? null : (error ?? this.error),
     );
@@ -63,28 +54,8 @@ class CameraNotifier extends StateNotifier<CameraState> {
     state = state.copyWith(referenceImage: file);
   }
 
-  void setOpacity(double value) {
-    state = state.copyWith(opacity: value);
-  }
-
-  void setShowOverlay(bool value) {
-    state = state.copyWith(showOverlay: value);
-  }
-
   void clearCapture() {
     state = state.copyWith(clearCapturedPhoto: true);
-  }
-
-  Future<void> capturePhoto() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.camera);
-      if (picked != null) {
-        state = state.copyWith(capturedPhoto: File(picked.path));
-      }
-    } catch (e) {
-      state = state.copyWith(error: 'Capture failed: $e');
-    }
   }
 
   void setCapturedPhoto(File file) {

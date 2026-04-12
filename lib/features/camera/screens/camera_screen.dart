@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -21,10 +20,6 @@ class CameraScreen extends ConsumerStatefulWidget {
 }
 
 class _CameraScreenState extends ConsumerState<CameraScreen> {
-  // Slider auto-fade
-  bool _sliderVisible = false;
-  Timer? _sliderTimer;
-
   static const _cameraChannel =
       MethodChannel('com.example.trip_planner/camera');
 
@@ -39,53 +34,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
 
   @override
   void dispose() {
-    _sliderTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
-  }
-
-  // --- Overlay toggle: 3-state logic ---
-  void _onOverlayToggleTap() {
-    final camState = ref.read(cameraProvider);
-    final notifier = ref.read(cameraProvider.notifier);
-
-    if (!camState.showOverlay) {
-      notifier.setShowOverlay(true);
-      _showSliderWithTimer();
-    } else if (!_sliderVisible) {
-      _showSliderWithTimer();
-    } else {
-      notifier.setShowOverlay(false);
-      _hideSlider();
-    }
-  }
-
-  void _showSliderWithTimer() {
-    _sliderTimer?.cancel();
-    setState(() => _sliderVisible = true);
-    _sliderTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _sliderVisible = false);
-    });
-  }
-
-  void _onSliderInteraction(double value) {
-    ref.read(cameraProvider.notifier).setOpacity(value);
-    _sliderTimer?.cancel();
-    _sliderTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _sliderVisible = false);
-    });
-  }
-
-  void _hideSlider() {
-    _sliderTimer?.cancel();
-    setState(() => _sliderVisible = false);
   }
 
   // --- Camera launch ---
   Future<void> _launchCamera() async {
     final camState = ref.read(cameraProvider);
 
-    // Android: use floating overlay + native camera
+    // Android: native overlay (foreground service) + system camera
     if (Platform.isAndroid && camState.referenceImage != null) {
       try {
         // Check overlay permission
@@ -135,7 +92,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
       }
     }
 
-    // Fallback: image_picker (iOS, desktop, or no reference loaded)
+    // image_picker fallback (iOS, desktop, or no reference image)
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.camera,
@@ -196,14 +153,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         fit: StackFit.expand,
         children: [
           // Layer 1: Reference image or empty state
-          if (camState.referenceImage != null && camState.showOverlay)
+          if (camState.referenceImage != null)
             Positioned.fill(
-              child: Opacity(
-                opacity: camState.opacity,
-                child: Image.file(
-                  camState.referenceImage!,
-                  fit: BoxFit.contain,
-                ),
+              child: Image.file(
+                camState.referenceImage!,
+                fit: BoxFit.contain,
               ),
             )
           else
@@ -237,61 +191,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    _FloatingIconButton(
-                      icon: Icons.arrow_back,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    const Spacer(),
-                    if (camState.referenceImage != null)
-                      _FloatingIconButton(
-                        icon: camState.showOverlay
-                            ? Icons.layers
-                            : Icons.layers_clear,
-                        onTap: _onOverlayToggleTap,
-                      ),
-                  ],
+                child: _FloatingIconButton(
+                  icon: Icons.arrow_back,
+                  onTap: () => Navigator.pop(context),
                 ),
               ),
             ),
           ),
 
-          // Layer 3: Opacity slider (vertical, right edge, animated fade)
-          if (camState.referenceImage != null)
-            Positioned(
-              right: 16,
-              top: 120,
-              bottom: 160,
-              child: AnimatedOpacity(
-                opacity: _sliderVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: IgnorePointer(
-                  ignoring: !_sliderVisible,
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: SliderTheme(
-                      data: SliderThemeData(
-                        trackHeight: 2,
-                        thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 8),
-                        activeTrackColor: Colors.white,
-                        inactiveTrackColor: Colors.white24,
-                        thumbColor: Colors.white,
-                        overlayColor:
-                            Colors.white.withValues(alpha: 0.2),
-                      ),
-                      child: Slider(
-                        value: camState.opacity,
-                        onChanged: _onSliderInteraction,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Layer 4: Bottom controls
+          // Layer 3: Bottom controls
           Positioned(
             bottom: 0,
             left: 0,
@@ -309,7 +217,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
                       size: 52,
                       onTap: _pickReferenceImage,
                     ),
-                    // Shutter — launches native camera (with PIP on Android)
+                    // Shutter — launches system camera (with overlay on Android)
                     _ShutterButton(
                       onTap: _launchCamera,
                     ),
