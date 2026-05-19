@@ -11,11 +11,18 @@ import '../widgets/week_strip.dart';
 import '../widgets/time_chunk_card.dart';
 import '../../../core/utils/schedule_utils.dart';
 
-class CalendarScreen extends ConsumerWidget {
+class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
+}
+
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+  bool _isBacklogExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final selectedDate = ref.watch(selectedDateProvider);
     final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
     final chunksAsync = ref.watch(timeChunksByDateProvider(dateStr));
@@ -40,8 +47,8 @@ class CalendarScreen extends ConsumerWidget {
               final picked = await showDatePicker(
                 context: context,
                 initialDate: selectedDate,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(2030),
+                firstDate: DateTime(DateTime.now().year - 10),
+                lastDate: DateTime(DateTime.now().year + 10),
               );
               if (picked != null) {
                 ref.read(selectedDateProvider.notifier).state = picked;
@@ -149,8 +156,13 @@ class CalendarScreen extends ConsumerWidget {
             ),
           ),
 
-          // Backlog section
-          Container(
+          // -----------------------------------------------------------
+          // Backlog Section：AnimatedContainer
+          // -----------------------------------------------------------
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            height: _isBacklogExpanded ? 600 : 300,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               border: Border(
@@ -162,27 +174,41 @@ class CalendarScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.inbox, size: 18),
-                      const SizedBox(width: 8),
-                      Text('Backlog',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const Spacer(),
-                      backlogAsync.when(
-                        data: (chunks) => Text('${chunks.length} items',
-                            style: Theme.of(context).textTheme.labelSmall),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, _) => const SizedBox.shrink(),
-                      ),
-                    ],
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isBacklogExpanded = !_isBacklogExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.inbox, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Backlog',
+                            style: Theme.of(context).textTheme.titleSmall),
+                        const Spacer(),
+                        backlogAsync.when(
+                          data: (chunks) => Text('${chunks.length} items',
+                              style: Theme.of(context).textTheme.labelSmall),
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          _isBacklogExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_up,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                SizedBox(
-                  height: 120,
+                
+                Expanded(
                   child: backlogAsync.when(
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
@@ -197,7 +223,10 @@ class CalendarScreen extends ConsumerWidget {
                         error: (err, _) =>
                             Center(child: Text('Error: $err')),
                         data: (poisMap) => ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12, 
+                            vertical: 4
+                          ),
                           itemCount: chunks.length,
                           itemBuilder: (context, index) {
                             final chunk = chunks[index];
@@ -229,9 +258,9 @@ class CalendarScreen extends ConsumerWidget {
     );
   }
 
-  void _scheduleForDate(WidgetRef ref, TimeChunk chunk, String dateStr) {
+  Future<void> _scheduleForDate(WidgetRef ref, TimeChunk chunk, String dateStr) async {
     final db = ref.read(databaseProvider);
-    db.updateTimeChunk(TimeChunksCompanion(
+    await db.updateTimeChunk(TimeChunksCompanion(
       id: Value(chunk.id),
       poiId: Value(chunk.poiId),
       date: Value(dateStr),
@@ -240,5 +269,4 @@ class CalendarScreen extends ConsumerWidget {
       status: const Value('scheduled'),
     ));
   }
-
 }
