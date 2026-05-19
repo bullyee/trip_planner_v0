@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../providers/poi_provider.dart';
+import '../../../core/utils/schedule_utils.dart';
 
 class PoiDetailScreen extends ConsumerWidget {
   final String poiId;
@@ -270,7 +271,7 @@ class PoiDetailScreen extends ConsumerWidget {
                       context: ctx,
                       initialDate: DateTime.now(),
                       firstDate: DateTime(2024),
-                      lastDate: DateTime(2030),
+                      lastDate: DateTime(DateTime.now().year + 20),
                     );
                     if (picked != null) {
                       setDialogState(() => selectedDate = picked);
@@ -336,6 +337,9 @@ class PoiDetailScreen extends ConsumerWidget {
     switch (action) {
       case 'delete':
         await db.deleteTimeChunk(chunk.id);
+        break;
+      case 'edit':
+        showScheduleEditDialog(context, ref, chunk);
         break;
       case 'scheduled':
       case 'completed':

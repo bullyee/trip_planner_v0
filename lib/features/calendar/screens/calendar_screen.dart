@@ -10,6 +10,7 @@ import '../../poi/providers/poi_provider.dart';
 import '../providers/calendar_provider.dart';
 import '../widgets/week_strip.dart';
 import '../widgets/time_chunk_card.dart';
+import '../../../core/utils/schedule_utils.dart';
 
 class CalendarScreen extends ConsumerWidget {
   const CalendarScreen({super.key});
@@ -251,6 +252,7 @@ class CalendarScreen extends ConsumerWidget {
         db.deleteTimeChunk(chunk.id);
         break;
       case 'edit':
+        showScheduleEditDialog(context, ref, chunk);
         break;
       case 'scheduled':
       case 'completed':
@@ -276,4 +278,5 @@ class CalendarScreen extends ConsumerWidget {
         break;
     }
   }
+
 }
