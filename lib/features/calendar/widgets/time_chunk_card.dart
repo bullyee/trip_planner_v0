@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/database.dart';
 
@@ -22,7 +23,7 @@ class TimeChunkCard extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {},
+        onTap: () => context.push('/pois/${chunk.poiId}'),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -103,8 +104,6 @@ class TimeChunkCard extends StatelessWidget {
                   const PopupMenuDivider(),
                   const PopupMenuItem(
                       value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(
-                      value: 'view-poi', child: Text('Visit Details')),
                   const PopupMenuItem(
                       value: 'delete', child: Text('Delete')),
                 ],

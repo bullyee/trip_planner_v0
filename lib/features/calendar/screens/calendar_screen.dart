@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:intl/intl.dart';
 
@@ -141,7 +140,7 @@ class CalendarScreen extends ConsumerWidget {
                         chunk: chunk,
                         poiName: poi?.name ?? 'Unknown POI',
                         onAction: (action) =>
-                            _handleChunkAction(context, ref, action, chunk),
+                            handleTimeChunkAction(context, ref, action, chunk),
                       );
                     },
                   );
@@ -240,43 +239,6 @@ class CalendarScreen extends ConsumerWidget {
       endTime: Value(chunk.endTime ?? '12:00'),
       status: const Value('scheduled'),
     ));
-  }
-
-  void _handleChunkAction(BuildContext context, WidgetRef ref, String action, TimeChunk chunk) {
-    final db = ref.read(databaseProvider);
-    switch (action) {
-      case 'view-poi':
-        context.push('/pois/${chunk.poiId}');
-        break;
-      case 'delete':
-        db.deleteTimeChunk(chunk.id);
-        break;
-      case 'edit':
-        showScheduleEditDialog(context, ref, chunk);
-        break;
-      case 'scheduled':
-      case 'completed':
-      case 'skipped':
-        db.updateTimeChunk(TimeChunksCompanion(
-          id: Value(chunk.id),
-          poiId: Value(chunk.poiId),
-          date: Value(chunk.date),
-          startTime: Value(chunk.startTime),
-          endTime: Value(chunk.endTime),
-          status: Value(action),
-        ));
-        break;
-      case 'backlog':
-        db.updateTimeChunk(TimeChunksCompanion(
-          id: Value(chunk.id),
-          poiId: Value(chunk.poiId),
-          date: Value(null),
-          startTime: Value(null),
-          endTime: Value(null),
-          status: Value(action),
-        ));
-        break;
-    }
   }
 
 }

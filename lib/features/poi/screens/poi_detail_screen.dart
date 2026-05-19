@@ -123,7 +123,7 @@ class PoiDetailScreen extends ConsumerWidget {
                                     : null,
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (action) =>
-                                      _handleChunkAction(
+                                      handleTimeChunkAction(
                                           context, ref, action, chunk),
                                   itemBuilder: (context) {
                                     final List<PopupMenuEntry<String>> menuItems = [];
@@ -329,41 +329,6 @@ class PoiDetailScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _handleChunkAction(BuildContext context, WidgetRef ref, String action,
-      TimeChunk chunk) async {
-    final db = ref.read(databaseProvider);
-    switch (action) {
-      case 'delete':
-        await db.deleteTimeChunk(chunk.id);
-        break;
-      case 'edit':
-        showScheduleEditDialog(context, ref, chunk);
-        break;
-      case 'scheduled':
-      case 'completed':
-      case 'skipped':
-        db.updateTimeChunk(TimeChunksCompanion(
-          id: Value(chunk.id),
-          poiId: Value(chunk.poiId),
-          date: Value(chunk.date),
-          startTime: Value(chunk.startTime),
-          endTime: Value(chunk.endTime),
-          status: Value(action),
-        ));
-        break;
-      case 'backlog':
-        db.updateTimeChunk(TimeChunksCompanion(
-          id: Value(chunk.id),
-          poiId: Value(chunk.poiId),
-          date: Value(null),
-          startTime: Value(null),
-          endTime: Value(null),
-          status: Value(action),
-        ));
-        break;
-    }
   }
 
   Widget _statusIcon(String status) {

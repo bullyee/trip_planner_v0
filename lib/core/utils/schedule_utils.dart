@@ -6,6 +6,40 @@ import 'package:intl/intl.dart';
 import '../../../core/database/database.dart';
 import '../../../core/providers/database_provider.dart';
 
+void handleTimeChunkAction(BuildContext context, WidgetRef ref, String action, TimeChunk chunk) {
+  final db = ref.read(databaseProvider);
+  switch (action) {
+    case 'delete':
+      db.deleteTimeChunk(chunk.id);
+      break;
+    case 'edit':
+      showScheduleEditDialog(context, ref, chunk);
+      break;
+    case 'scheduled':
+    case 'completed':
+    case 'skipped':
+      db.updateTimeChunk(TimeChunksCompanion(
+        id: Value(chunk.id),
+        poiId: Value(chunk.poiId),
+        date: Value(chunk.date),
+        startTime: Value(chunk.startTime),
+        endTime: Value(chunk.endTime),
+        status: Value(action),
+      ));
+      break;
+    case 'backlog':
+      db.updateTimeChunk(TimeChunksCompanion(
+        id: Value(chunk.id),
+        poiId: Value(chunk.poiId),
+        date: Value(null),
+        startTime: Value(null),
+        endTime: Value(null),
+        status: Value(action),
+      ));
+      break;
+  }
+}
+
 void showScheduleEditDialog(
   BuildContext context, WidgetRef ref, TimeChunk chunk) {
 DateTime? selectedDate = chunk.date != null 
@@ -14,77 +48,77 @@ DateTime? selectedDate = chunk.date != null
 final startController = TextEditingController(text: chunk.startTime ?? '10:00');
 final endController = TextEditingController(text: chunk.endTime ?? '12:00');
 
-showDialog(
-  context: context,
-  builder: (ctx) => StatefulBuilder(
-    builder: (ctx, setDialogState) => AlertDialog(
-      title: const Text('Edit Time Slot'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.calendar_today),
-            title: Text(selectedDate != null
-                ? DateFormat('yyyy-MM-dd').format(selectedDate!)
-                : 'Select Date'),
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: ctx,
-                initialDate: selectedDate,
-                firstDate: DateTime(DateTime.now().year - 10),
-                lastDate: DateTime(DateTime.now().year + 10),
-              );
-              if (picked != null) {
-                setDialogState(() => selectedDate = picked);
-              }
+  showDialog(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: const Text('Edit Time Slot'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today),
+              title: Text(selectedDate != null
+                  ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+                  : 'Select Date'),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: selectedDate,
+                  firstDate: DateTime(DateTime.now().year - 10),
+                  lastDate: DateTime(DateTime.now().year + 10),
+                );
+                if (picked != null) {
+                  setDialogState(() => selectedDate = picked);
+                }
+              },
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: startController,
+                    decoration:
+                        const InputDecoration(labelText: 'Start'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    controller: endController,
+                    decoration:
+                        const InputDecoration(labelText: 'End'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final db = ref.read(databaseProvider);
+              db.updateTimeChunk(TimeChunksCompanion(
+                id: Value(chunk.id),
+                poiId: Value(chunk.poiId),
+                date: Value(selectedDate != null
+                    ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+                    : null),
+                startTime: Value(startController.text.trim()),
+                endTime: Value(endController.text.trim()),
+                status: Value(chunk.status),
+              ));
+              Navigator.pop(ctx);
             },
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: startController,
-                  decoration:
-                      const InputDecoration(labelText: 'Start'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextField(
-                  controller: endController,
-                  decoration:
-                      const InputDecoration(labelText: 'End'),
-                ),
-              ),
-            ],
+            child: const Text('Edit'),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
-            final db = ref.read(databaseProvider);
-            db.updateTimeChunk(TimeChunksCompanion(
-              id: Value(chunk.id),
-              poiId: Value(chunk.poiId),
-              date: Value(selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(selectedDate!)
-                  : null),
-              startTime: Value(startController.text.trim()),
-              endTime: Value(endController.text.trim()),
-              status: Value(chunk.status),
-            ));
-            Navigator.pop(ctx);
-          },
-          child: const Text('Edit'),
-        ),
-      ],
     ),
-  ),
-);
+  );
 }
