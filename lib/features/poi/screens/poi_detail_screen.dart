@@ -124,23 +124,31 @@ class PoiDetailScreen extends ConsumerWidget {
                                   onSelected: (action) =>
                                       _handleChunkAction(
                                           context, ref, action, chunk),
-                                  itemBuilder: (_) => [
-                                    const PopupMenuItem(
-                                        value: 'schedule',
-                                        child: Text('Schedule')),
-                                    const PopupMenuItem(
-                                        value: 'complete',
-                                        child: Text('Complete')),
-                                    const PopupMenuItem(
-                                        value: 'skip',
-                                        child: Text('Skip')),
-                                    const PopupMenuItem(
-                                        value: 'backlog',
-                                        child: Text('To Backlog')),
-                                    const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Delete')),
-                                  ],
+                                  itemBuilder: (context) {
+                                    final List<PopupMenuEntry<String>> menuItems = [];
+                                    if (chunk.status != 'backlog') {
+                                      if (chunk.status != 'scheduled') {
+                                        menuItems.add(const PopupMenuItem(
+                                          value: 'scheduled',
+                                          child: Text('Schedule'),
+                                        ));
+                                      }
+                                      if (chunk.status != 'completed'){
+                                        menuItems.add(const PopupMenuItem(
+                                            value: 'completed', child: Text('Complete')));
+                                      }
+                                      if (chunk.status != 'skipped'){
+                                        menuItems.add(const PopupMenuItem(
+                                            value: 'skipped', child: Text('Skip')));
+                                      }
+                                      menuItems.add(const PopupMenuItem(
+                                        value: 'backlog', child: Text('To Backlog')));
+                                      menuItems.add(const PopupMenuDivider());
+                                    }
+                                    menuItems.add(const PopupMenuItem(value: 'edit', child: Text('Edit')));
+                                    menuItems.add(const PopupMenuItem(value: 'delete', child: Text('Delete')));
+                                    return menuItems;
+                                  }
                                 ),
                               ),
                             ))
@@ -329,23 +337,26 @@ class PoiDetailScreen extends ConsumerWidget {
       case 'delete':
         await db.deleteTimeChunk(chunk.id);
         break;
-      case 'schedule':
-      case 'complete':
-      case 'skip':
-      case 'backlog':
-        await db.updateTimeChunk(TimeChunksCompanion(
+      case 'scheduled':
+      case 'completed':
+      case 'skipped':
+        db.updateTimeChunk(TimeChunksCompanion(
           id: Value(chunk.id),
           poiId: Value(chunk.poiId),
           date: Value(chunk.date),
           startTime: Value(chunk.startTime),
           endTime: Value(chunk.endTime),
-          status: Value(action == 'schedule'
-              ? 'scheduled'
-              : action == 'complete'
-                  ? 'completed'
-                  : action == 'skip'
-                      ? 'skipped'
-                      : 'backlog'),
+          status: Value(action),
+        ));
+        break;
+      case 'backlog':
+        db.updateTimeChunk(TimeChunksCompanion(
+          id: Value(chunk.id),
+          poiId: Value(chunk.poiId),
+          date: Value(null),
+          startTime: Value(null),
+          endTime: Value(null),
+          status: Value(action),
         ));
         break;
     }

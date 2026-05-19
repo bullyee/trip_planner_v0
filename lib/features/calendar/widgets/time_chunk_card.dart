@@ -87,6 +87,10 @@ class TimeChunkCard extends StatelessWidget {
                 onSelected: onAction,
                 icon: const Icon(Icons.more_vert, size: 20),
                 itemBuilder: (_) => [
+                  if (chunk.status != 'scheduled')
+                    const PopupMenuItem(
+                      value: 'scheduled', child: Text('Schedule'),
+                    ),
                   if (chunk.status != 'completed')
                     const PopupMenuItem(
                         value: 'completed', child: Text('Complete')),
@@ -96,6 +100,11 @@ class TimeChunkCard extends StatelessWidget {
                   if (chunk.status != 'backlog')
                     const PopupMenuItem(
                         value: 'backlog', child: Text('To Backlog')),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                      value: 'edit', child: Text('Edit')),
+                  const PopupMenuItem(
+                      value: 'view-poi', child: Text('Visit Details')),
                   const PopupMenuItem(
                       value: 'delete', child: Text('Delete')),
                 ],
