@@ -2,24 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../poi/providers/poi_provider.dart';
+import '../../roi/providers/roi_provider.dart';
+import '../providers/last_selected_backlog_roi_provider.dart';
 import '../providers/calendar_provider.dart';
 import '../widgets/week_strip.dart';
 import '../widgets/time_chunk_card.dart';
+import '../../../core/utils/schedule_utils.dart';
 
-class CalendarScreen extends ConsumerWidget {
+class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
+}
+
+class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+  bool _isBacklogExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final selectedDate = ref.watch(selectedDateProvider);
     final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
     final chunksAsync = ref.watch(timeChunksByDateProvider(dateStr));
     final backlogAsync = ref.watch(backlogChunksProvider);
     final poisMapAsync = ref.watch(allPoisProvider);
+
+    // Backlog heights calculated proportionally to the screen height
+    final screenHeight = MediaQuery.of(context).size.height;
+    final expandedBacklogHeight = screenHeight * 0.4; // 40%
+    final collapsedBacklogHeight = screenHeight * 0.2; // 20%
 
     return Scaffold(
       appBar: AppBar(
@@ -36,11 +52,11 @@ class CalendarScreen extends ConsumerWidget {
             icon: const Icon(Icons.calendar_month),
             tooltip: 'Pick date',
             onPressed: () async {
-              final picked = await showDatePicker(
+              final picked = await showMonthCalendarPicker(
                 context: context,
                 initialDate: selectedDate,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(2030),
+                firstDate: DateTime(DateTime.now().year - 10),
+                lastDate: DateTime(DateTime.now().year + 10),
               );
               if (picked != null) {
                 ref.read(selectedDateProvider.notifier).state = picked;
@@ -139,7 +155,7 @@ class CalendarScreen extends ConsumerWidget {
                         chunk: chunk,
                         poiName: poi?.name ?? 'Unknown POI',
                         onAction: (action) =>
-                            _handleChunkAction(ref, action, chunk),
+                            handleTimeChunkAction(context, ref, action, chunk),
                       );
                     },
                   );
@@ -148,8 +164,15 @@ class CalendarScreen extends ConsumerWidget {
             ),
           ),
 
-          // Backlog section
-          Container(
+          // -----------------------------------------------------------
+          // Backlog Section：AnimatedContainer
+          // -----------------------------------------------------------
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            height: _isBacklogExpanded
+              ? expandedBacklogHeight
+              : collapsedBacklogHeight,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               border: Border(
@@ -161,27 +184,49 @@ class CalendarScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.inbox, size: 18),
-                      const SizedBox(width: 8),
-                      Text('Backlog',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const Spacer(),
-                      backlogAsync.when(
-                        data: (chunks) => Text('${chunks.length} items',
-                            style: Theme.of(context).textTheme.labelSmall),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, _) => const SizedBox.shrink(),
-                      ),
-                    ],
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isBacklogExpanded = !_isBacklogExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.inbox, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Backlog',
+                            style: Theme.of(context).textTheme.titleSmall),
+                        const Spacer(),
+                        backlogAsync.when(
+                          data: (chunks) => Text('${chunks.length} items',
+                              style: Theme.of(context).textTheme.labelSmall),
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.add, size: 20),
+                          tooltip: 'Add to backlog',
+                          onPressed: () => _showAddToBacklogDialog(context, ref),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          _isBacklogExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_up,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                SizedBox(
-                  height: 120,
+                
+                Expanded(
                   child: backlogAsync.when(
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
@@ -196,7 +241,10 @@ class CalendarScreen extends ConsumerWidget {
                         error: (err, _) =>
                             Center(child: Text('Error: $err')),
                         data: (poisMap) => ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12, 
+                            vertical: 4
+                          ),
                           itemCount: chunks.length,
                           itemBuilder: (context, index) {
                             final chunk = chunks[index];
@@ -207,10 +255,40 @@ class CalendarScreen extends ConsumerWidget {
                                 leading:
                                     const Icon(Icons.location_on, size: 20),
                                 title: Text(poi?.name ?? chunk.poiId),
-                                trailing: FilledButton.tonal(
-                                  onPressed: () => _scheduleForDate(
-                                      ref, chunk, dateStr),
-                                  child: const Text('Schedule'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36, minHeight: 36),
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(Icons.delete),
+                                      tooltip: 'Delete',
+                                      onPressed: () => confirmDeleteTimeChunkAndRemove(
+                                        context, ref, chunk),
+                                    ),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36, minHeight: 36),
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(Icons.edit),
+                                      tooltip: 'Edit',
+                                      onPressed: () => showScheduleEditDialog(
+                                        context, ref, chunk),
+                                    ),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36, minHeight: 36),
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(Icons.add),
+                                      tooltip: 'Schedule',
+                                      onPressed: () => _scheduleForDate(
+                                        ref, chunk, dateStr),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -228,9 +306,9 @@ class CalendarScreen extends ConsumerWidget {
     );
   }
 
-  void _scheduleForDate(WidgetRef ref, TimeChunk chunk, String dateStr) {
+  Future<void> _scheduleForDate(WidgetRef ref, TimeChunk chunk, String dateStr) async {
     final db = ref.read(databaseProvider);
-    db.updateTimeChunk(TimeChunksCompanion(
+    await db.updateTimeChunk(TimeChunksCompanion(
       id: Value(chunk.id),
       poiId: Value(chunk.poiId),
       date: Value(dateStr),
@@ -240,19 +318,170 @@ class CalendarScreen extends ConsumerWidget {
     ));
   }
 
-  void _handleChunkAction(WidgetRef ref, String action, TimeChunk chunk) {
-    final db = ref.read(databaseProvider);
-    if (action == 'delete') {
-      db.deleteTimeChunk(chunk.id);
-      return;
-    }
-    db.updateTimeChunk(TimeChunksCompanion(
-      id: Value(chunk.id),
-      poiId: Value(chunk.poiId),
-      date: Value(action == 'backlog' ? null : chunk.date),
-      startTime: Value(action == 'backlog' ? null : chunk.startTime),
-      endTime: Value(action == 'backlog' ? null : chunk.endTime),
-      status: Value(action),
-    ));
+  Future<void> _showAddToBacklogDialog(BuildContext context, WidgetRef ref) async {
+    if (!context.mounted) return;
+
+    String? selectedRoiId;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Consumer(
+              builder: (context, dialogRef, _) {
+                final roisAsync = dialogRef.watch(allRoisProvider);
+
+                return AlertDialog(
+                  title: const Text('Add to Backlog'),
+                  content: roisAsync.when(
+                    loading: () => const SizedBox(
+                      width: 400,
+                      height: 300,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (err, _) => SizedBox(
+                      width: 400,
+                      height: 300,
+                      child: Center(child: Text('Error: $err')),
+                    ),
+                    data: (rois) {
+                      if (rois.isEmpty) {
+                        return const SizedBox(
+                          width: 400,
+                          height: 300,
+                          child: Center(child: Text('No ROIs available')),
+                        );
+                      }
+
+                      // Initialize selectedRoiId with previously saved ROI or first ROI
+                      final saved = dialogRef.read(lastSelectedBacklogRoiProvider);
+                      selectedRoiId ??= saved ?? rois.first.id;
+
+                      // Show ROI selector and POI list in fixed layout
+                      final poisAsync = dialogRef.watch(poisByRoiProvider(selectedRoiId!));
+                      return SizedBox(
+                        width: 400,
+                        height: 400,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Region label
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Region',
+                                  style: Theme.of(context).textTheme.labelMedium,
+                                ),
+                              ),
+                            ),
+                            // ROI Selector (fixed at top)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: selectedRoiId,
+                                items: rois
+                                    .map((roi) => DropdownMenuItem<String>(
+                                          value: roi.id,
+                                          child: Text(roi.name),
+                                        ))
+                                    .toList(),
+                                onChanged: (String? newRoiId) {
+                                  if (newRoiId != null) {
+                                    setDialogState(() {
+                                      selectedRoiId = newRoiId;
+                                    });
+                                    // persist selection in session state
+                                    dialogRef.read(lastSelectedBacklogRoiProvider.notifier).state = newRoiId;
+                                  }
+                                },
+                              ),
+                            ),
+                            // Locations label
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Locations',
+                                  style: Theme.of(context).textTheme.labelMedium,
+                                ),
+                              ),
+                            ),
+                            // POI List
+                            Expanded(
+                              child: poisAsync.when(
+                                loading: () => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                error: (err, _) => Center(
+                                  child: Text('Error: $err'),
+                                ),
+                                data: (pois) {
+                                  if (pois.isEmpty) {
+                                    return const Center(
+                                      child: Text('No locations yet.'),
+                                    );
+                                  }
+                                  return ListView.separated(
+                                    itemCount: pois.length,
+                                    separatorBuilder: (context, index) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final poi = pois[index];
+                                      return ListTile(
+                                        title: Text(poi.name),
+                                        subtitle: Text(poi.address ?? 'No address'),
+                                        onTap: () async {
+                                          // persist last selected ROI for backlog block
+                                          dialogRef.read(lastSelectedBacklogRoiProvider.notifier).state = selectedRoiId;
+                                          // Create a new time chunk in backlog status
+                                          final db = dialogRef.read(databaseProvider);
+                                          await db.insertTimeChunk(
+                                            TimeChunksCompanion(
+                                              id: Value(const Uuid().v4()),
+                                              poiId: Value(poi.id),
+                                              date: Value(null),
+                                              startTime: Value('10:00'),
+                                              endTime: Value('12:00'),
+                                              status: const Value('backlog'),
+                                            ),
+                                          );
+                                          if (context.mounted) {
+                                            Navigator.pop(context);
+                                          }
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
+
 }
