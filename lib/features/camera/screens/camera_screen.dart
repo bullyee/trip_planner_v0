@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,50 @@ import '../../poi/providers/poi_provider.dart';
 import '../providers/camera_provider.dart';
 
 enum _CameraFrameMode { native, screenFill }
+
+class _CropArgs {
+  final String sourcePath;
+  final String targetPath;
+  final double targetAspectRatio;
+
+  const _CropArgs({
+    required this.sourcePath,
+    required this.targetPath,
+    required this.targetAspectRatio,
+  });
+}
+
+Future<String?> _cropPhotoToAspectInIsolate(_CropArgs args) async {
+  final bytes = await File(args.sourcePath).readAsBytes();
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return null;
+
+  final oriented = img.bakeOrientation(decoded);
+  final imageAspectRatio = oriented.width / oriented.height;
+
+  var cropX = 0;
+  var cropY = 0;
+  var cropWidth = oriented.width;
+  var cropHeight = oriented.height;
+
+  if (imageAspectRatio > args.targetAspectRatio) {
+    cropWidth = (oriented.height * args.targetAspectRatio).round();
+    cropX = ((oriented.width - cropWidth) / 2).round();
+  } else if (imageAspectRatio < args.targetAspectRatio) {
+    cropHeight = (oriented.width / args.targetAspectRatio).round();
+    cropY = ((oriented.height - cropHeight) / 2).round();
+  }
+
+  final cropped = img.copyCrop(
+    oriented,
+    x: cropX,
+    y: cropY,
+    width: cropWidth,
+    height: cropHeight,
+  );
+  await File(args.targetPath).writeAsBytes(img.encodeJpg(cropped, quality: 95));
+  return args.targetPath;
+}
 
 class CameraScreen extends ConsumerStatefulWidget {
   final String? poiId;
@@ -173,42 +218,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     File photoFile,
     double targetAspectRatio,
   ) async {
+    final targetPath = photoFile.path.replaceFirst(
+      RegExp(r'\.(jpe?g|png)$', caseSensitive: false),
+      '_screen.jpg',
+    );
     try {
-      final bytes = await photoFile.readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) return photoFile;
-
-      final oriented = img.bakeOrientation(decoded);
-      final imageAspectRatio = oriented.width / oriented.height;
-
-      var cropX = 0;
-      var cropY = 0;
-      var cropWidth = oriented.width;
-      var cropHeight = oriented.height;
-
-      if (imageAspectRatio > targetAspectRatio) {
-        cropWidth = (oriented.height * targetAspectRatio).round();
-        cropX = ((oriented.width - cropWidth) / 2).round();
-      } else if (imageAspectRatio < targetAspectRatio) {
-        cropHeight = (oriented.width / targetAspectRatio).round();
-        cropY = ((oriented.height - cropHeight) / 2).round();
-      }
-
-      final cropped = img.copyCrop(
-        oriented,
-        x: cropX,
-        y: cropY,
-        width: cropWidth,
-        height: cropHeight,
-      );
-      final croppedFile = File(
-        photoFile.path.replaceFirst(
-          RegExp(r'\.(jpe?g|png)$', caseSensitive: false),
-          '_screen.jpg',
+      final result = await compute(
+        _cropPhotoToAspectInIsolate,
+        _CropArgs(
+          sourcePath: photoFile.path,
+          targetPath: targetPath,
+          targetAspectRatio: targetAspectRatio,
         ),
       );
-      await croppedFile.writeAsBytes(img.encodeJpg(cropped, quality: 95));
-      return croppedFile;
+      if (result == null) return photoFile;
+      return File(result);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -929,6 +953,8 @@ class _ComparisonLayout extends StatefulWidget {
 
 class _ComparisonLayoutState extends State<_ComparisonLayout> {
   bool? _capturedIsPortrait;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
 
   @override
   void initState() {
@@ -941,24 +967,43 @@ class _ComparisonLayoutState extends State<_ComparisonLayout> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.capturedPhoto.path != widget.capturedPhoto.path) {
       _capturedIsPortrait = null;
+      _disposeImageStream();
       _resolveCapturedOrientation();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposeImageStream();
+    super.dispose();
+  }
+
+  void _disposeImageStream() {
+    final stream = _imageStream;
+    final listener = _imageStreamListener;
+    if (stream != null && listener != null) {
+      stream.removeListener(listener);
+    }
+    _imageStream = null;
+    _imageStreamListener = null;
   }
 
   void _resolveCapturedOrientation() {
     final provider = FileImage(widget.capturedPhoto);
     final stream = provider.resolve(ImageConfiguration.empty);
-    late ImageStreamListener listener;
-
-    listener = ImageStreamListener((info, _) {
-      final image = info.image;
-      if (!mounted) return;
+    final listener = ImageStreamListener((info, _) {
+      if (!mounted) {
+        _disposeImageStream();
+        return;
+      }
       setState(() {
-        _capturedIsPortrait = image.height >= image.width;
+        _capturedIsPortrait = info.image.height >= info.image.width;
       });
-      stream.removeListener(listener);
+      _disposeImageStream();
     });
 
+    _imageStream = stream;
+    _imageStreamListener = listener;
     stream.addListener(listener);
   }
 
