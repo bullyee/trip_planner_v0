@@ -48,3 +48,15 @@ final distinctTagsProvider = StreamProvider<List<String>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchDistinctTags();
 });
+
+final poisByAnimeSeriesProvider =
+    StreamProvider.family<List<Poi>, String>((ref, name) {
+  final db = ref.watch(databaseProvider);
+  return db.watchPoisByAnimeSeries(name);
+});
+
+final poisByTagProvider =
+    StreamProvider.family<List<Poi>, String>((ref, tag) {
+  final db = ref.watch(databaseProvider);
+  return db.watchPoisByTag(tag);
+});

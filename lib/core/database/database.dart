@@ -73,6 +73,20 @@ class AppDatabase extends _$AppDatabase {
 
   Stream<List<Poi>> watchAllPois() => select(pois).watch();
 
+  Stream<List<Poi>> watchPoisByAnimeSeries(String name) =>
+      (select(pois)..where((p) => p.animeSeriesRef.equals(name))).watch();
+
+  Stream<List<Poi>> watchPoisByTag(String tag) {
+    return select(pois).watch().map((rows) {
+      return rows.where((p) {
+        final tagStr = p.tags?.trim();
+        if (tagStr == null || tagStr.isEmpty) return false;
+        final tagList = tagStr.split(',').map((t) => t.trim());
+        return tagList.contains(tag);
+      }).toList();
+    });
+  }
+
   Future<int> insertPoi(PoisCompanion poi) => into(pois).insert(poi);
 
   Future<bool> updatePoi(PoisCompanion poi) => update(pois).replace(
