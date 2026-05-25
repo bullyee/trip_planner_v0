@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../providers/poi_provider.dart';
+import '../../roi/providers/roi_provider.dart';
 import '../../../core/utils/schedule_utils.dart';
 
 class PoiDetailScreen extends ConsumerWidget {
@@ -58,10 +59,64 @@ class PoiDetailScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ROI breadcrumb
+              Consumer(
+                builder: (context, ref, _) {
+                  final roiAsync = ref.watch(roiByIdProvider(poi.roiId));
+                  return roiAsync.maybeWhen(
+                    data: (roi) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () => context.push('/rois/${poi.roiId}'),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.place_outlined,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              roi.name,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    orElse: () => const SizedBox.shrink(),
+                  );
+                },
+              ),
+
+              // Anime hero chip
               if (poi.animeSeriesRef != null) ...[
-                Chip(label: Text(poi.animeSeriesRef!)),
-                const SizedBox(height: 12),
+                Chip(
+                  avatar: Icon(
+                    Icons.movie_outlined,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                  label: Text(
+                    poi.animeSeriesRef!,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                const SizedBox(height: 16),
               ],
+
+              // Description
               if (poi.description != null) ...[
                 Text(
                   poi.description!,
@@ -69,31 +124,75 @@ class PoiDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-              if (poi.address != null)
-                ListTile(
-                  leading: const Icon(Icons.location_on),
-                  title: Text(poi.address!),
-                  contentPadding: EdgeInsets.zero,
+
+              // Info card (address + gps + hours + contact)
+              Card(
+                margin: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    if (poi.address != null)
+                      ListTile(
+                        leading: const Icon(Icons.location_on_outlined),
+                        title: Text(poi.address!),
+                        dense: true,
+                      ),
+                    ListTile(
+                      leading: const Icon(Icons.gps_fixed),
+                      title: Text('${poi.lat}, ${poi.lng}'),
+                      dense: true,
+                    ),
+                    if (poi.businessHours != null)
+                      ListTile(
+                        leading: const Icon(Icons.access_time),
+                        title: Text(poi.businessHours!),
+                        dense: true,
+                      ),
+                    if (poi.contactInfo != null)
+                      ListTile(
+                        leading: const Icon(Icons.contact_phone_outlined),
+                        title: Text(poi.contactInfo!),
+                        dense: true,
+                      ),
+                  ],
                 ),
-              ListTile(
-                leading: const Icon(Icons.gps_fixed),
-                title: Text('${poi.lat}, ${poi.lng}'),
-                contentPadding: EdgeInsets.zero,
               ),
-              if (poi.businessHours != null)
-                ListTile(
-                  leading: const Icon(Icons.access_time),
-                  title: Text(poi.businessHours!),
-                  contentPadding: EdgeInsets.zero,
+              const SizedBox(height: 16),
+
+              // Tags
+              if (poi.tags != null && poi.tags!.trim().isNotEmpty) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Icon(
+                        Icons.label_outline,
+                        size: 18,
+                        color:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: poi.tags!
+                            .split(',')
+                            .map((t) => t.trim())
+                            .where((t) => t.isNotEmpty)
+                            .map((tag) => Chip(
+                                  label: Text(tag),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
                 ),
-              if (poi.tags != null) ...[
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: (poi.tags!.split(','))
-                      .map((tag) => Chip(label: Text(tag.trim())))
-                      .toList(),
-                ),
               ],
 
               // Schedule section

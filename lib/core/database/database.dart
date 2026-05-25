@@ -40,6 +40,9 @@ class AppDatabase extends _$AppDatabase {
   Future<Roi> getRoiById(String id) =>
       (select(rois)..where((r) => r.id.equals(id))).getSingle();
 
+  Stream<Roi> watchRoiById(String id) =>
+      (select(rois)..where((r) => r.id.equals(id))).watchSingle();
+
   Future<int> insertRoi(RoisCompanion roi) => into(rois).insert(roi);
 
   Future<bool> updateRoi(RoisCompanion roi) => update(rois).replace(
@@ -65,6 +68,11 @@ class AppDatabase extends _$AppDatabase {
   Future<Poi> getPoiById(String id) =>
       (select(pois)..where((p) => p.id.equals(id))).getSingle();
 
+  Stream<Poi> watchPoiById(String id) =>
+      (select(pois)..where((p) => p.id.equals(id))).watchSingle();
+
+  Stream<List<Poi>> watchAllPois() => select(pois).watch();
+
   Future<int> insertPoi(PoisCompanion poi) => into(pois).insert(poi);
 
   Future<bool> updatePoi(PoisCompanion poi) => update(pois).replace(
@@ -85,6 +93,34 @@ class AppDatabase extends _$AppDatabase {
       );
 
   Future<List<Poi>> getAllPois() => select(pois).get();
+
+  Stream<List<String>> watchDistinctAnimeSeries() {
+    return select(pois).watch().map((rows) {
+      final series = <String>{};
+      for (final p in rows) {
+        final name = p.animeSeriesRef?.trim();
+        if (name != null && name.isNotEmpty) {
+          series.add(name);
+        }
+      }
+      return series.toList()..sort();
+    });
+  }
+
+  Stream<List<String>> watchDistinctTags() {
+    return select(pois).watch().map((rows) {
+      final tags = <String>{};
+      for (final p in rows) {
+        final tagStr = p.tags?.trim();
+        if (tagStr == null || tagStr.isEmpty) continue;
+        for (final t in tagStr.split(',')) {
+          final trimmed = t.trim();
+          if (trimmed.isNotEmpty) tags.add(trimmed);
+        }
+      }
+      return tags.toList()..sort();
+    });
+  }
 
   Future<int> deletePoi(String id) =>
       (delete(pois)..where((p) => p.id.equals(id))).go();

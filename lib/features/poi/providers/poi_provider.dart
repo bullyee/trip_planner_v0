@@ -8,9 +8,9 @@ final poisByRoiProvider =
   return db.watchPoisByRoi(roiId);
 });
 
-final poiByIdProvider = FutureProvider.family<Poi, String>((ref, id) {
+final poiByIdProvider = StreamProvider.family<Poi, String>((ref, id) {
   final db = ref.watch(databaseProvider);
-  return db.getPoiById(id);
+  return db.watchPoiById(id);
 });
 
 final mediaAssetsByPoiProvider =
@@ -32,8 +32,19 @@ final timeChunksByPoiProvider =
       .watch();
 });
 
-final allPoisProvider = FutureProvider<Map<String, Poi>>((ref) async {
+final allPoisProvider = StreamProvider<Map<String, Poi>>((ref) {
   final db = ref.watch(databaseProvider);
-  final pois = await db.getAllPois();
-  return {for (final poi in pois) poi.id: poi};
+  return db.watchAllPois().map(
+        (pois) => {for (final poi in pois) poi.id: poi},
+      );
+});
+
+final distinctAnimeSeriesProvider = StreamProvider<List<String>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchDistinctAnimeSeries();
+});
+
+final distinctTagsProvider = StreamProvider<List<String>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchDistinctTags();
 });
