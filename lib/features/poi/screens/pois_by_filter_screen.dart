@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/database/database.dart';
+import '../../roi/providers/roi_provider.dart';
 import '../providers/poi_provider.dart';
 
 class PoisByAnimeScreen extends ConsumerWidget {
@@ -62,14 +64,20 @@ class PoisByTagScreen extends ConsumerWidget {
   }
 }
 
-class _PoiListView extends StatelessWidget {
+class _PoiListView extends ConsumerWidget {
   final AsyncValue poisAsync;
   final String emptyText;
 
   const _PoiListView({required this.poisAsync, required this.emptyText});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roisAsync = ref.watch(allRoisProvider);
+    final roiMap = roisAsync.maybeWhen(
+      data: (rois) => {for (final r in rois) r.id: r},
+      orElse: () => <String, Roi>{},
+    );
+
     return poisAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Error: $err')),
@@ -82,11 +90,12 @@ class _PoiListView extends StatelessWidget {
           itemCount: pois.length,
           itemBuilder: (context, index) {
             final poi = pois[index];
+            final roiName = roiMap[poi.roiId]?.name;
             return Card(
               child: ListTile(
                 leading: const Icon(Icons.location_on),
                 title: Text(poi.name),
-                subtitle: poi.address != null ? Text(poi.address!) : null,
+                subtitle: roiName != null ? Text(roiName) : null,
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/pois/${poi.id}'),
               ),

@@ -95,7 +95,7 @@ class PoiDetailScreen extends ConsumerWidget {
 
               // Anime hero chip
               if (poi.animeSeriesRef != null) ...[
-                Chip(
+                ActionChip(
                   avatar: Icon(
                     Icons.movie_outlined,
                     size: 20,
@@ -112,6 +112,9 @@ class PoiDetailScreen extends ConsumerWidget {
                   backgroundColor:
                       Theme.of(context).colorScheme.primaryContainer,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  onPressed: () => context.push(
+                    '/anime/${Uri.encodeComponent(poi.animeSeriesRef!)}',
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -181,11 +184,14 @@ class PoiDetailScreen extends ConsumerWidget {
                             .split(',')
                             .map((t) => t.trim())
                             .where((t) => t.isNotEmpty)
-                            .map((tag) => Chip(
+                            .map((tag) => ActionChip(
                                   label: Text(tag),
                                   visualDensity: VisualDensity.compact,
                                   materialTapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
+                                  onPressed: () => context.push(
+                                    '/tag/${Uri.encodeComponent(tag)}',
+                                  ),
                                 ))
                             .toList(),
                       ),

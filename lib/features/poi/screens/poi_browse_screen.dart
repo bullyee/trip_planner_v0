@@ -20,6 +20,7 @@ class PoiBrowseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final initialIndex = _tabOrder.indexOf(initialTab ?? '');
     return DefaultTabController(
+      key: ValueKey(initialTab ?? 'default'),
       length: 4,
       initialIndex: initialIndex >= 0 ? initialIndex : 0,
       child: Scaffold(
@@ -33,9 +34,9 @@ class PoiBrowseScreen extends StatelessWidget {
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             tabs: [
-              Tab(icon: Icon(Icons.layers), text: 'By Region'),
-              Tab(icon: Icon(Icons.movie_outlined), text: 'By Anime'),
-              Tab(icon: Icon(Icons.label_outline), text: 'By Tag'),
+              Tab(icon: Icon(Icons.layers), text: 'Region'),
+              Tab(icon: Icon(Icons.movie_outlined), text: 'Anime'),
+              Tab(icon: Icon(Icons.label_outline), text: 'Tag'),
               Tab(icon: Icon(Icons.list), text: 'All'),
             ],
           ),
