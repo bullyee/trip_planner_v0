@@ -6,8 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 import 'tables.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart'; //add for map
 part 'database.g.dart';
+
+
 
 @DriftDatabase(tables: [Rois, Pois, TimeChunks, MediaAssets])
 class AppDatabase extends _$AppDatabase {
@@ -128,3 +130,7 @@ LazyDatabase _openConnection() {
     return NativeDatabase.createInBackground(file);
   });
 }
+
+
+
+final appDatabaseProvider = Provider<AppDatabase>((ref) => AppDatabase()); // add for map

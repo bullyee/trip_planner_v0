@@ -46,6 +46,13 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _HomeCard(
+              icon: Icons.map,
+              title: 'Map',
+              subtitle: 'Visualize your itinerary',
+              onTap: () => context.push('/map'),
+            ),
+            const SizedBox(height: 12),
+            _HomeCard(
               icon: Icons.camera_alt,
               title: 'Anime Camera',
               subtitle: 'AR photo overlay with reference',
