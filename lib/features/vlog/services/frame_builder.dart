@@ -112,9 +112,9 @@ class FrameBuilder {
     const titleH = 70;
     const titleY = 50;
 
-    const mainPadding = 20;
+    const mainPadding = 24;
     const panelPadding = 18;
-    const panelGap = 48;
+    const panelGap = 24;
 
     final contentX = mainX + mainPadding;
     final contentY = mainY + mainPadding;
