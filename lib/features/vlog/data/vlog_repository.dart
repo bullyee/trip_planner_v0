@@ -15,16 +15,17 @@ class VlogRepository {
       final assets = await db.getMediaAssetsByPoi(poi.id);
       final referenceImages = await db.getReferenceImagesByPoi(poi.id);
 
-      final userPhotos = assets.where((assets) {
-        return assets.type == 'user_photo';
+      final frameAssets = assets.where((assets) {
+        return assets.type == 'user_photo' || assets.type == 'uploaded_image';
       });
 
-      for (final photo in userPhotos) {
+      for (final photo in frameAssets) {
         final linkedReference = photo.referenceImageId == null
             ? null
             : referenceImages
                 .where((image) => image.id == photo.referenceImageId)
                 .firstOrNull;
+                
         final referenceImagePath = linkedReference?.localUri ??
             (referenceImages.isNotEmpty ? referenceImages.first.localUri : null) ??
             poi.coverImageUri;

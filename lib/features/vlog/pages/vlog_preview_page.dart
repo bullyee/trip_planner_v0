@@ -97,7 +97,7 @@ class _VlogPreviewPageState extends ConsumerState<VlogPreviewPage> {
 
       final videoPath = await ffmpeg.createVideoFromImages(
         imagePaths: framePaths,
-        secondsPerImage: 4,
+        secondsPerImage: 3,
       );
 
       // store to photo album

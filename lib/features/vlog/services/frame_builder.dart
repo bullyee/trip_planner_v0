@@ -106,15 +106,24 @@ class FrameBuilder {
     const mainY = 120;
     const mainW = 960;
     const mainH = 420;
+    
 
     const titleW = 480;
     const titleH = 70;
     const titleY = 50;
 
-    const maxInnerW = 420;
-    const maxInnerH = 340;
-    const padding = 18;
+    const mainPadding = 20;
+    const panelPadding = 18;
     const panelGap = 48;
+
+    final contentX = mainX + mainPadding;
+    final contentY = mainY + mainPadding;
+    final contentW = mainW - mainPadding * 2;
+    final contentH = mainH - mainPadding * 2;
+    final maxPanelW = (contentW - panelGap) ~/ 2;
+    final maxPanelH = contentH;
+    final maxInnerW = maxPanelW - panelPadding * 2;
+    final maxInnerH = maxPanelH - panelPadding * 2;
 
     // color
     final canvasColor = img.ColorRgb8(156, 103, 58); // wood
@@ -137,22 +146,24 @@ class FrameBuilder {
     final hasRef = resizedRef != null;
 
     // calculate panel size
-    final userPanelSize = _panelSizeForImage(resizedUser, padding: padding);
+    final userPanelSize = _panelSizeForImage(resizedUser, padding: panelPadding);
     final refPanelSize = resizedRef == null
         ? (width: 0, height: 0)
-        : _panelSizeForImage(resizedRef, padding: padding);
+        : _panelSizeForImage(resizedRef, padding: panelPadding);
+
+    final contentCenterX = contentX + contentW ~/ 2;
 
     final totalPanelW = hasRef
         ? refPanelSize.width + panelGap + userPanelSize.width
         : userPanelSize.width;
     final leftPanelX = hasRef
-        ? (frameW - totalPanelW) ~/ 2
+        ? contentCenterX - totalPanelW ~/ 2
         : 0;
     final rightPanelX = hasRef
         ? leftPanelX + refPanelSize.width + panelGap
-        : (frameW - totalPanelW) ~/ 2;
+        : contentCenterX - userPanelSize.width ~/ 2;
 
-    final panelCenterY = mainY + mainH ~/ 2;
+    final panelCenterY = contentY + contentH ~/ 2;
     final leftPanelY = hasRef
         ? panelCenterY - refPanelSize.height ~/ 2
         : 0;
