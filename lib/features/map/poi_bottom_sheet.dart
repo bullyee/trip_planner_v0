@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/database/database.dart';
@@ -32,11 +34,15 @@ class PoiBottomSheet extends StatelessWidget {
           if (poi.coverImageUri != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                poi.coverImageUri!,
+              child: Image.file(
+                File(poi.coverImageUri!),
                 height: 180,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                errorBuilder: (_, _, _) => Container(
+                  height: 180,
+                  color: Colors.black12,
+                  child: const Icon(Icons.broken_image, size: 48),
+                ),
               ),
             ),
           const SizedBox(height: 12),
