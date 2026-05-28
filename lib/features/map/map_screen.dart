@@ -7,6 +7,7 @@ import 'roi_filter_bar.dart';
 import '../../core/database/database.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -60,6 +61,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     )).toList();
   }
 
+  // 移動到標點群中心
+  void _fitMarkers(List<Poi> pois) {
+    if (pois.isEmpty) return;
+    if (pois.length == 1) {
+      _mapController.move(LatLng(pois.first.lat, pois.first.lng), 14);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(
+      pois.map((p) => LatLng(p.lat, p.lng)).toList(),
+    );
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: bounds,
+        padding: const EdgeInsets.all(50),
+      ),
+    );
+  }
+
+  // 移動到使用者當前位置
+  Future<void> _moveToCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition();
+      _mapController.move(LatLng(position.latitude, position.longitude), 10);
+    } catch (e) {
+      // 無法取得位置時不動
+    }
+  }
+
   void _showPoiSheet(Poi poi) {
     showModalBottomSheet(
       context: context,
@@ -77,6 +114,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapNotifierProvider);
     final markers = _buildMarkers(mapState.pois, mapState.selectedPoi);
+
+    // 當 pois 更新時自動移動地圖
+    ref.listen(mapNotifierProvider, (previous, next) {
+      if (previous?.pois != next.pois) {
+        if (next.pois.isEmpty) {
+          _moveToCurrentLocation();
+        } else if (next.selectedDate != null) {
+          // 選了日期，移到標點群中心
+          _fitMarkers(next.pois);
+        } else if (next.selectedRoiId == null && next.selectedDate == null) {
+          // 回到全部，移到使用者位置
+          _moveToCurrentLocation();
+        }
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('地點地圖')),
