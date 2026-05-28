@@ -10,7 +10,7 @@ class FFmpegService {
     required List<String> imagePaths,
     int secondsPerImage = 3,
   }) async {
-
+    
     final dir = await getApplicationDocumentsDirectory();
 
     final outputPath = '${dir.path}/vlog_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -18,9 +18,13 @@ class FFmpegService {
     // build input pattern
 
     final tempDir = Directory('${dir.path}/frames');
-    if (!await tempDir.exists()) {
-      await tempDir.create(recursive: true);
+
+    // clean folder
+    if (await tempDir.exists()) {
+      await tempDir.delete(recursive: true);
     }
+    
+    await tempDir.create(recursive: true);
 
     // copy to ffmpeg readable format
     for (int i = 0; i < imagePaths.length; i++) {
@@ -36,14 +40,23 @@ class FFmpegService {
         '-c:v mpeg4 -pix_fmt yuv420p '
         '"$outputPath"';
 
-    final session = await FFmpegKit.execute(command);
+    try {
+      
+      final session = await FFmpegKit.execute(command);
 
-    final returnCode = await session.getReturnCode();
+      final returnCode = await session.getReturnCode();
 
-    if (!ReturnCode.isSuccess(returnCode)) {
-      throw Exception('FFmpeg failed: $returnCode');
+      if (!ReturnCode.isSuccess(returnCode)) {
+        throw Exception('FFmpeg failed: $returnCode');
+      }
+
+      return outputPath;
+    } finally {
+
+      // clear frames
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
     }
-
-    return outputPath;
   }
 }
