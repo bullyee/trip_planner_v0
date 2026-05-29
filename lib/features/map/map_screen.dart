@@ -156,7 +156,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('地點地圖')),
+      appBar: AppBar(
+                title: const Text('地點地圖'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.my_location),
+                    onPressed: () async {
+                      await _fetchCurrentLocation();
+                      if (_currentLocation != null) {
+                        _mapController.move(_currentLocation!, 14);
+                      }
+                    },
+                  ),
+                ],
+              ),
       body: Column(
         children: [
           Row(
@@ -185,12 +198,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   }
                 },
               ),
-              if (mapState.selectedDate != null)
-                TextButton(
-                  onPressed: () =>
-                      ref.read(mapNotifierProvider.notifier).loadPoisByDate(null),
-                  child: const Text('清除'),
-                ),
+              
             ],
           ),
           Expanded(
@@ -205,10 +213,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.trip_planner',
                 ),
-                MarkerLayer(
-                  markers: markers,
-                  rotate: false,
-                ),
+                MarkerLayer(markers: markers),
+                if (_currentLocation != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _currentLocation!,
+                        width: 48,
+                        height: 48,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.3),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.blue, width: 2),
+                              ),
+                            ),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    rotate: false,
+                  ),
               ],
             ),
           ),
