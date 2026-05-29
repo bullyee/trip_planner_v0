@@ -30,6 +30,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     Colors.brown,
   ];
 
+  LatLng? _currentLocation;
+  
   // 用 roiId 對應到顏色
   final Map<String, Color> _roiColorMap = {};
 
@@ -97,6 +99,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+      });
+    } catch (e) {
+      // 無法取得位置
+    }
+  }
+
   void _showPoiSheet(Poi poi) {
     showModalBottomSheet(
       context: context,
@@ -108,6 +127,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ).whenComplete(
       () => ref.read(mapNotifierProvider.notifier).clearSelection(),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCurrentLocation();
   }
 
   @override
