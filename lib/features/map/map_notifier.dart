@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/database.dart';
+import '../../core/providers/database_provider.dart';
 import 'map_state.dart';
 import '../../core/database/tables.dart';
 
 final mapNotifierProvider =
     StateNotifierProvider<MapNotifier, MapState>((ref) {
-  final db = ref.watch(appDatabaseProvider);
+  final db = ref.watch(databaseProvider);
   return MapNotifier(db);
 });
 

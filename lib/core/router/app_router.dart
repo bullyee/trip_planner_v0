@@ -11,6 +11,7 @@ import '../../features/camera/screens/camera_screen.dart';
 import '../../features/ticket/screens/ticket_screen.dart';
 import '../../features/home/screens/sync_screen.dart';
 import '../../features/map/map_screen.dart';
+import '../../features/vlog/pages/vlog_preview_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -79,6 +80,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/tickets',
       builder: (context, state) => const TicketScreen(),
+    ),
+    GoRoute(
+      path: '/vlog',
+      builder: (context, state) => const VlogPreviewPage(),
     ),
     GoRoute(
       path: '/sync',
