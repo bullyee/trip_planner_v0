@@ -15,6 +15,7 @@ import '../services/comparison_image_service.dart';
 import '../services/edit_preview_service.dart';
 import '../services/media_asset_service.dart';
 import '../services/sharpness_service.dart';
+import 'collage_page.dart';
 
 /// One step in the edit history.
 ///
@@ -176,6 +177,12 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
   // side-by-side with the reference and Save persists a
   // `comparison_image` MediaAsset instead of overwriting the source.
   bool _compareMode = false;
+
+  // When true the editor shows the Compose (collage) page instead of the
+  // Adjust page. Kept alive in an IndexedStack so going Back to Adjust
+  // doesn't lose placed cutout / overlay layers. Only reachable when a
+  // reference image is in play (the cutout source).
+  bool _collagePage = false;
 
   // True while the user is actively dialling in a tool's parameters.
   // In this submode the AppBar swaps to Cancel + tool name + Confirm,
@@ -1206,25 +1213,39 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: TextButton(
-            // Save the edited photo directly. (The reference-overlay "Compose"
-            // cutout flow is intentionally not ported here.)
-            onPressed: _saving ? null : _save,
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              disabledForegroundColor: Colors.white38,
-            ),
-            child: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Save'),
-          ),
+          child: hasReference
+              ? TextButton(
+                  // With a reference, the forward action is Compose (cutout +
+                  // overlay layers); Save lives on the Compose page, which
+                  // flattens base + layers into the saved photo.
+                  onPressed: (_processing || _editingBaseBytes == null)
+                      ? null
+                      : () => setState(() => _collagePage = true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    disabledForegroundColor: Colors.white38,
+                  ),
+                  child: const Text('Compose →'),
+                )
+              : TextButton(
+                  // No reference to compose against — save the edited photo
+                  // directly.
+                  onPressed: _saving ? null : _save,
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    disabledForegroundColor: Colors.white38,
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save'),
+                ),
         ),
       ],
     );
@@ -1400,7 +1421,31 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
       ),
     );
 
-    return adjust;
+    // Adjust → Compose → Save. Keep Compose alive in an IndexedStack so going
+    // Back to Adjust doesn't lose placed layers. Compose needs a reference
+    // (the cutout source) + the prepared base; without one, Adjust saves
+    // directly and there's no Compose page.
+    final base = _editingBaseBytes;
+    final refPath = _referencePath;
+    if (base == null || refPath == null) {
+      if (_collagePage) _collagePage = false;
+      return adjust;
+    }
+    return IndexedStack(
+      index: _collagePage ? 1 : 0,
+      sizing: StackFit.expand,
+      children: [
+        adjust,
+        CollagePage(
+          basePreview: _chainBase ?? base,
+          resolveFullResBase: () async =>
+              await _resolveBytesForSave() ?? await _sourceFile.readAsBytes(),
+          referencePath: refPath,
+          poiId: widget.poiId,
+          onBack: () => setState(() => _collagePage = false),
+        ),
+      ],
+    );
   }
 }
 
