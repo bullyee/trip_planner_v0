@@ -14,7 +14,12 @@ class FFmpegService {
     required String? bgmPath,
   }) {
     // bgm command
-    final audioInput = bgmPath == null ? <String>[] : ['-i ${_q(bgmPath)}'];
+    final audioInput = bgmPath == null 
+        ? <String>[] 
+        : [
+            '-stream_loop -1',
+            '-i ${_q(bgmPath)}',
+          ];
     final audioArgs = bgmPath == null
         ? <String>[]
         : [
@@ -58,6 +63,7 @@ class FFmpegService {
     final audioInputIndex = framePath.length;
 
     if (bgmPath != null) {
+      input.add('-stream_loop -1');
       input.add('-i ${_q(bgmPath)}');
     }
 
