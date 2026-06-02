@@ -11,7 +11,6 @@ import '../../../core/providers/database_provider.dart';
 import '../../camera/services/reinhard_match_service.dart';
 import '../providers/poi_provider.dart';
 import '../services/brightness_service.dart';
-import '../services/comparison_image_service.dart';
 import '../services/edit_preview_service.dart';
 import '../services/media_asset_service.dart';
 import '../services/sharpness_service.dart';
@@ -172,11 +171,6 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
   // every slider release after that.
   PreparedSharpness? _sharpnessCache;
   bool _preparingSharpness = false;
-
-  // Compare toggle — when on, the canvas renders the edited captured
-  // side-by-side with the reference and Save persists a
-  // `comparison_image` MediaAsset instead of overwriting the source.
-  bool _compareMode = false;
 
   // When true the editor shows the Compose (collage) page instead of the
   // Adjust page. Kept alive in an IndexedStack so going Back to Adjust
@@ -764,70 +758,12 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
     }
   }
 
-  /// Compare is now a canvas toggle, not a one-shot action — flipping
-  /// it renders the edited captured side-by-side with the reference,
-  /// and Save persists whichever view is currently on screen (the
-  /// edited single shot when the toggle is off, the side-by-side
-  /// comparison JPEG when it's on).
-  void _toggleCompare() {
-    if (!_hasReference) return;
-    setState(() => _compareMode = !_compareMode);
-  }
-
-
   Future<void> _save() async {
     if (_saving) return;
     final db = ref.read(databaseProvider);
-    final referenceFile = _referenceFile;
 
     setState(() => _saving = true);
     try {
-      // Compare toggle on: stitch the full-res edited captured next
-      // to the reference and write it as a brand-new `comparison_image`
-      // MediaAsset — the original source file is left alone, so the
-      // user can still save the single shot later.
-      if (_compareMode && referenceFile != null) {
-        final editedBytes = await _resolveBytesForSave() ??
-            await _sourceFile.readAsBytes();
-        final referenceBytes = await referenceFile.readAsBytes();
-        final composed = await compute(
-          generateComparison,
-          ComparisonArgs(
-            capturedBytes: editedBytes,
-            referenceBytes: referenceBytes,
-          ),
-        );
-        final tempFile = File(p.join(
-          Directory.systemTemp.path,
-          'comparison_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        ));
-        await tempFile.writeAsBytes(composed, flush: true);
-
-        final bool ok;
-        try {
-          ok = await persistMediaAsset(
-            db: db,
-            source: tempFile,
-            poiId: widget.poiId,
-            type: 'comparison_image',
-            referenceImageId: _referenceImageId,
-          );
-        } finally {
-          // persistMediaAsset copies the stitch into permanent storage, so
-          // the systemTemp staging file is no longer needed — delete it to
-          // stop the temp dir from growing on every Compare save.
-          if (await tempFile.exists()) await tempFile.delete();
-        }
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text(ok ? 'Comparison saved.' : 'Save failed.')),
-        );
-        if (ok) Navigator.of(context).pop();
-        return;
-      }
-
       // Single-shot save: write the edited bytes over the source so
       // persistMediaAsset's copy-into-storage step picks them up, then
       // record the matching MediaAsset row.
@@ -1294,24 +1230,9 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
     );
   }
 
-  /// Outer canvas wrapper: in Compare mode the edited captured sits
-  /// next to the reference as a 50 / 50 split; otherwise the canvas
-  /// is the single edited captured (with the optional translucent
-  /// overlay layered on top).
+  /// Outer canvas wrapper: the single edited captured, with the
+  /// optional translucent reference overlay layered on top.
   Widget _buildCanvasContent(Uint8List? currentBytes, File? reference) {
-    if (_compareMode && reference != null) {
-      return Row(
-        children: [
-          Expanded(child: Center(child: _buildEditingCanvas(currentBytes))),
-          Container(width: 2, color: Colors.white24),
-          Expanded(
-            child: Center(
-              child: Image.file(reference, fit: BoxFit.contain),
-            ),
-          ),
-        ],
-      );
-    }
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -1392,11 +1313,9 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
                         ),
                       ),
                     ),
-                  // Floating opacity bar — only when the AppBar overlay
-                  // is on AND Compare mode is off (Compare already
-                  // shows both images, so the overlay layer is hidden
-                  // and its controls go with it).
-                  if (hasReference && !_compareMode)
+                  // Floating opacity bar — only when a reference image
+                  // is in play to overlay.
+                  if (hasReference)
                     Positioned(
                       left: 12,
                       right: 12,
@@ -1450,8 +1369,8 @@ class _PhotoEditScreenState extends ConsumerState<PhotoEditScreen> {
 }
 
 /// Floating overlay control bar — sits at the bottom edge of the
-/// canvas whenever a reference image is in play (and Compare mode
-/// isn't on). Layout matches the camera screen's bottom row:
+/// canvas whenever a reference image is in play. Layout matches the
+/// camera screen's bottom row:
 ///
 ///   visible:  [🗏] [slider────────] [↻ reset] [👁‍🗨 hide]
 ///   hidden:                                   [👁 show]
