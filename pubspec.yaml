@@ -87,6 +87,12 @@ dev_dependencies:
   json_serializable: ^6.9.4
   freezed: ^2.4.1
 
+# Pin path_provider_android to the last platform-channel release. 2.3.0+ moved to
+# JNI bindings and crashes with "No JNI instance available" at runtime; 2.2.23 is
+# the last stable pre-JNI version and drops the jni/jni_flutter transitive deps.
+dependency_overrides:
+  path_provider_android: 2.2.23
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
